@@ -184,7 +184,7 @@ def prepare_data(
             # Predicting genres
             genre_model = TensorflowPredict2D(graphFilename="genre_discogs400-discogs-effnet-1.pb", input="serving_default_model_Placeholder", output="PartitionedCall:0")
             predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.2)
+            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.3)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
             if metadata.genre is not None:
                 print('Augmenting auto-label', ','.join(filtered_labels), 'with metadata', metadata.genre)
@@ -200,7 +200,7 @@ def prepare_data(
             # Predicting instruments
             instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
             predictions = instrument_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.1)
+            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.2)
             result_dict['instruments'] = filtered_labels
 
 
@@ -234,20 +234,20 @@ def prepare_data(
                     max_sample_rate = sr
 
                 entry = {
-                    "key": f"{key}",
                     "artist": result.get('artist', ""),
-                    "sample_rate": sr,
-                    "file_extension": "wav",
+                    "title": result.get('title', ""),
                     "description": result.get('description', ""),
-                    "keywords": "",
+                    "key": f"{key}",
+                    "sample_rate": sr,
                     "duration": length,
                     "bpm": tempo,
                     "genre": result.get('genres', ""),
-                    "title": result.get('title', ""),
-                    "name": "",
                     "instrument": result.get('instruments', ""),
                     "moods": result.get('moods', []),
                     "path": str(filename),
+                    "file_extension": "wav",
+                    "keywords": "",
+                    "name": ""
                 }
                 with open(str(filename).rsplit('.', 1)[0] + '.json', "w") as file:
                     json.dump(entry, file)
