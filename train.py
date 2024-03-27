@@ -184,7 +184,7 @@ def prepare_data(
             # Predicting genres
             genre_model = TensorflowPredict2D(graphFilename="genre_discogs400-discogs-effnet-1.pb", input="serving_default_model_Placeholder", output="PartitionedCall:0")
             predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.05)
+            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.2)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
             if metadata.genre is not None:
                 print('Augmenting auto-label', ','.join(filtered_labels), 'with metadata', metadata.genre)
@@ -194,13 +194,13 @@ def prepare_data(
             # Predicting mood/theme
             mood_model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
             predictions = mood_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.03)
+            filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.1)
             result_dict['moods'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting instruments
             instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
             predictions = instrument_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.05)
+            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.1)
             result_dict['instruments'] = filtered_labels
 
 
