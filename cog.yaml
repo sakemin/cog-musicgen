@@ -54,6 +54,7 @@ build:
     - "numba"
     - "essentia-tensorflow"
     - "moviepy"
+    - "tinytag"
 
   # commands run after the environment is setup
   run:

@@ -24,8 +24,8 @@ from essentia.standard import (
     MonoLoader,
     TensorflowPredictEffnetDiscogs,
     TensorflowPredict2D,
-    MetadataReader
 )
+from tinytag import TinyTag
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6,7'
 
 import torch
@@ -171,13 +171,11 @@ def prepare_data(
         def get_audio_features(audio_filename):
             audio = MonoLoader(filename=audio_filename, sampleRate=16000, resampleQuality=4)()
             # Load ID3 tags if available
-            metadata_pool = MetadataReader(filename=audio_filename)()
-            meta_genres = metadata_pool.get('metadata.tags.genre')
+            metadata = TinyTag.get(audio_filename)
 
             result_dict = {
-                "artist": metadata_pool.get('metadata.tags.artist'),
-                "title": metadata_pool.get('metadata.tags.title'),
-                "description": metadata_pool.get('metadata.tags.description')
+                "artist": metadata.artist,
+                "title": metadata.title
             }
 
             embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
@@ -188,9 +186,9 @@ def prepare_data(
             predictions = genre_model(embeddings)
             filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.05)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
-            if meta_genres is not None:
-                print('Augmenting auto-label', filter_labels.join(','), 'with metadata', meta_genres)
-                filter_labels = filter_labels + meta_genres.split(',')
+            if metadata.genre is not None:
+                print('Augmenting auto-label', filter_labels.join(','), 'with metadata', metadata.genre)
+                filter_labels = filter_labels + metadata.genre.split(',')
             result_dict['genres'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting mood/theme
