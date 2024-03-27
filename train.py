@@ -24,6 +24,7 @@ from essentia.standard import (
     MonoLoader,
     TensorflowPredictEffnetDiscogs,
     TensorflowPredict2D,
+    MetadataReader
 )
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6,7'
 
@@ -149,7 +150,7 @@ def prepare_data(
         from metadata import genre_labels, mood_theme_classes, instrument_classes
         import numpy as np
 
-        def filter_predictions(predictions, class_list, threshold=0.1):
+        def filter_predictions(predictions, class_list, threshold):
             predictions_mean = np.mean(predictions, axis=0)
             sorted_indices = np.argsort(predictions_mean)[::-1]
             filtered_indices = [i for i in sorted_indices if predictions_mean[i] > threshold]
@@ -161,36 +162,48 @@ def prepare_data(
             seen_tags = set()
             result = []
             for tag in ', '.join(tags).split(', '):
-                if tag not in seen_tags:
-                    result.append(tag)
-                    seen_tags.add(tag)
+                lower = tag.lower()
+                if lower not in seen_tags:
+                    result.append(lower)
+                    seen_tags.add(lower)
             return ', '.join(result)
 
         def get_audio_features(audio_filename):
             audio = MonoLoader(filename=audio_filename, sampleRate=16000, resampleQuality=4)()
+            # Load ID3 tags if available
+            metadata_pool = MetadataReader(filename=audio_filename)()
+            meta_genres = metadata_pool['metadata.tags.genre']
+
+            result_dict = {
+                "artist": metadata_pool.get('metadata.tags.artist'),
+                "title": metadata_pool.get('metadata.tags.title'),
+                "description": metadata_pool.get('metadata.tags.description')
+            }
+
             embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
             embeddings = embedding_model(audio)
-
-            result_dict = {}
 
             # Predicting genres
             genre_model = TensorflowPredict2D(graphFilename="genre_discogs400-discogs-effnet-1.pb", input="serving_default_model_Placeholder", output="PartitionedCall:0")
             predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels)
+            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.05)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
+            if meta_genres is not None:
+                filter_labels = filter_labels + meta_genres.split(',')
             result_dict['genres'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting mood/theme
             mood_model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
             predictions = mood_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.05)
+            filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.03)
             result_dict['moods'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting instruments
             instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
             predictions = instrument_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, instrument_classes)
+            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.05)
             result_dict['instruments'] = filtered_labels
+
 
             return result_dict
 
@@ -221,11 +234,9 @@ def prepare_data(
                 if sr > max_sample_rate:
                     max_sample_rate = sr
 
-                artist_name = ""
-
                 entry = {
                     "key": f"{key}",
-                    "artist": artist_name,
+                    "artist": "",
                     "sample_rate": sr,
                     "file_extension": "wav",
                     "description": "",
