@@ -187,8 +187,8 @@ def prepare_data(
             filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.05)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
             if metadata.genre is not None:
-                print('Augmenting auto-label', filter_labels.join(','), 'with metadata', metadata.genre)
-                filter_labels = filter_labels + metadata.genre.split(',')
+                print('Augmenting auto-label', ','.join(filtered_labels), 'with metadata', metadata.genre)
+                filtered_labels = filtered_labels + metadata.genre.split(',')
             result_dict['genres'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting mood/theme
