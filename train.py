@@ -161,8 +161,8 @@ def prepare_data(
         def make_comma_separated_unique(tags):
             seen_tags = set()
             result = []
-            for tag in ', '.join(tags).split(', '):
-                lower = tag.lower()
+            for tag in tags:
+                lower = tag.lower().strip()
                 if lower not in seen_tags:
                     result.append(lower)
                     seen_tags.add(lower)
