@@ -85,7 +85,7 @@ def prepare_data(
     if drop_vocals:
         import demucs.pretrained
         import torchaudio
-        separator = demucs.pretrained.get_model('mdx_extra').to('cuda')
+        separator = demucs.pretrained.get_model('htdemucs_ft').to('cuda')
     else:
         separator = None
 
