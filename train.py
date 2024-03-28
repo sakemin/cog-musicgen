@@ -171,7 +171,7 @@ def prepare_data(
             result_dict = {
                 "artist": metadata.artist,
                 "title": metadata.title,
-                "description": metadata.get('comment', "") + metadata.extra.get('description', "")
+                "description": metadata.comment + metadata.extra.get('description', "")
             }
 
             embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
@@ -335,7 +335,7 @@ def train(
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
     # Before we do a bunch of work, let's make sure dora is installed
-    sp.call(["python3", "dora_main.py", "--help"])
+    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info"])
 
     meta_path = 'src/meta'
     target_path = 'src/train_data'
