@@ -15,16 +15,16 @@ import os.path
 
 from cog import BaseModel, Input, Path
 import subprocess as sp
+import shutil
 from tqdm import tqdm
+from tinytag import TinyTag
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
 from essentia.standard import (
     MonoLoader,
     TensorflowPredictEffnetDiscogs,
     TensorflowPredict2D,
 )
-from tinytag import TinyTag
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6,7'
 
 import torch
@@ -45,8 +45,7 @@ def prepare_data(
         meta_path: str = 'src/meta',
         auto_labeling: bool = True,
         drop_vocals: bool = True,
-        device: str = 'cuda',
-        channels: int = 2):
+        device: str = 'cuda'):
 
     d_path = Path(target_path)
     d_path.mkdir(exist_ok=True, parents=True)
@@ -61,19 +60,16 @@ def prepare_data(
     elif str(dataset_path).rsplit('.', 1)[1] == 'tgz':
         sp.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'])
     elif str(dataset_path).rsplit('.', 1)[1] in ['wav', 'mp3', 'flac', 'mp4']:
-        import shutil
         shutil.move(str(dataset_path), target_path + '/' + str(dataset_path.name))
     else:
         raise Exception("Not supported compression file type. The file type should be one of 'zip', 'tar', 'tar.gz', 'tgz' types of compression file, or a single 'wav', 'mp3', 'flac', 'mp4' types of audio file.")
 
     # Removing __MACOSX and .DS_Store
     if (Path(target_path)/"__MACOSX").is_dir():
-        import shutil
         shutil.rmtree(target_path+"/__MACOSX")
     elif (Path(target_path)/"__MACOSX").is_file():
         os.remove(target_path+"/__MACOSX")
     if (Path(target_path)/".DS_Store").is_dir():
-        import shutil
         shutil.rmtree(target_path+"/.DS_Store")
     elif (Path(target_path)/".DS_Store").is_file():
         os.remove(target_path+"/.DS_Store")
@@ -335,7 +331,7 @@ def train(
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
     # Before we do a bunch of work, let's make sure dora is installed
-    sp.call(["dora", "--version"])
+    sp.call(["python3", "dora_main.py", "--help"])
 
     meta_path = 'src/meta'
     target_path = 'src/train_data'
@@ -349,7 +345,6 @@ def train(
         os.remove('weights')
     if os.path.isfile('weight'):
         os.remove('weight')
-    import shutil
     if os.path.isdir('weights'):
         shutil.rmtree('weights')
     if os.path.isdir('weight'):
@@ -363,11 +358,7 @@ def train(
     if os.path.isdir('tmp'):
         shutil.rmtree('tmp')
 
-    if "stereo" in model_version:
-        channels = 2
-    else:
-        channels = 1
-    max_sample_rate, len_dataset = prepare_data(dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, 'cuda', channels)
+    max_sample_rate, len_dataset = prepare_data(dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, 'cuda')
 
     if model_version in ["melody", "stereo-melody", "medium", "stereo-medium"]:
         batch_size = 8
@@ -422,7 +413,7 @@ def train(
         args.append("dataset.train.permutation_on_files=True")
         args.append(f"optim.updates_per_epoch={updates_per_epoch}")
 
-    sp.call(["dora"]+args)
+    sp.call(["python3", "dora_main.py"]+args)
 
     for dirpath, dirnames, filenames in os.walk("tmp"):
         for filename in [f for f in filenames if f == "checkpoint.th"]:

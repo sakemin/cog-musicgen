@@ -146,9 +146,9 @@ def get_parser():
     return parser
 
 
-def main(args):
+def main():
     parser = get_parser()
-    args = parser.parse_args(args)
+    args = parser.parse_args()
 
     setup_logging(args.verbose)
 
