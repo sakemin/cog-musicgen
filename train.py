@@ -136,10 +136,10 @@ def prepare_data(
 
     # Auto Labeling
     if auto_labeling:
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"])
-        sp.call(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"])
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"])
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"])
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"], check=True)
+        sp.call(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"], check=True)
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"], check=True)
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"], check=True)
 
 
         from metadata import genre_labels, mood_theme_classes, instrument_classes
@@ -335,7 +335,7 @@ def train(
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
     # Before we do a bunch of work, let's make sure dora is installed
-    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info"])
+    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info"], check=True)
 
     meta_path = 'src/meta'
     target_path = 'src/train_data'
@@ -417,7 +417,7 @@ def train(
         args.append("dataset.train.permutation_on_files=True")
         args.append(f"optim.updates_per_epoch={updates_per_epoch}")
 
-    sp.call(["python3", "dora_main.py"]+args)
+    sp.call(["python3", "dora_main.py"]+args, check=True)
 
     checkpoint_dir = None
     for dirpath, dirnames, filenames in os.walk("tmp"):
