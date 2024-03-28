@@ -170,7 +170,8 @@ def prepare_data(
 
             result_dict = {
                 "artist": metadata.artist,
-                "title": metadata.title
+                "title": metadata.title,
+                "description": metadata.get('comment', "") + metadata.extra.get('description', "")
             }
 
             embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
@@ -181,8 +182,9 @@ def prepare_data(
             predictions = genre_model(embeddings)
             filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.2)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
+            print({ 'auto.genre': ','.join(filtered_labels) })
             if metadata.genre is not None:
-                print('Augmenting auto-label', ','.join(filtered_labels), 'with metadata', metadata.genre)
+                print({ 'metadata.genre': metadata.genre })
                 filtered_labels = filtered_labels + metadata.genre.split(',')
             result_dict['genres'] = make_comma_separated_unique(filtered_labels)
 
@@ -190,12 +192,14 @@ def prepare_data(
             mood_model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
             predictions = mood_model(embeddings)
             filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.06)
+            print({ 'auto.moods': ','.join(filtered_labels) })
             result_dict['moods'] = make_comma_separated_unique(filtered_labels)
 
             # Predicting instruments
             instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
             predictions = instrument_model(embeddings)
             filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.15)
+            print({ 'auto.instruments': ','.join(filtered_labels) })
             result_dict['instruments'] = filtered_labels
 
 
@@ -382,7 +386,7 @@ def train(
         conditioner = "chroma2music"
     continue_from = f"//pretrained/facebook/musicgen-{model_version}"
 
-    args = ["run", "-d", "--", f"solver={solver}", f"model/lm/model_scale={model_scale}", f"continue_from={continue_from}", f"conditioner={conditioner}"]
+    args = ["run", "-d", "-P", "audiocraft", "--", f"solver={solver}", f"model/lm/model_scale={model_scale}", f"continue_from={continue_from}", f"conditioner={conditioner}"]
     if "stereo" in model_version:
         args.append(f"codebooks_pattern.delay.delays={[0, 0, 1, 1, 2, 2, 3, 3]}")
         args.append('transformer_lm.n_q=8')
@@ -415,10 +419,13 @@ def train(
 
     sp.call(["python3", "dora_main.py"]+args)
 
+    checkpoint_dir = None
     for dirpath, dirnames, filenames in os.walk("tmp"):
         for filename in [f for f in filenames if f == "checkpoint.th"]:
             checkpoint_dir = os.path.join(dirpath, filename)
 
+    if checkpoint_dir is None:
+        raise Exception("Training failed - no checkpoint found. Check the logs for more information.")
     loaded = torch.load(checkpoint_dir, map_location=torch.device('cpu'))
 
     torch.save({'xp.cfg': loaded["xp.cfg"], "model": loaded["model"]}, out_path)
