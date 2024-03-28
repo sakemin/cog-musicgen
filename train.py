@@ -13,7 +13,6 @@ import logging
 import os
 import os.path
 
-import subprocess
 from cog import BaseModel, Input, Path
 import subprocess as sp
 from tqdm import tqdm
@@ -54,13 +53,13 @@ def prepare_data(
 
     # Decompressing file at dataset_path
     if str(dataset_path).rsplit('.', 1)[1] == 'zip':
-        subprocess.run(['unzip', str(dataset_path), '-d', target_path + '/'])
+        sp.run(['unzip', str(dataset_path), '-d', target_path + '/'])
     elif str(dataset_path).rsplit('.', 1)[1] == 'tar':
-        subprocess.run(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'])
+        sp.run(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'])
     elif str(dataset_path).rsplit('.', 1)[1] == 'gz':
-        subprocess.run(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'])
+        sp.run(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'])
     elif str(dataset_path).rsplit('.', 1)[1] == 'tgz':
-        subprocess.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'])
+        sp.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'])
     elif str(dataset_path).rsplit('.', 1)[1] in ['wav', 'mp3', 'flac', 'mp4']:
         import shutil
         shutil.move(str(dataset_path), target_path + '/' + str(dataset_path.name))
@@ -184,7 +183,7 @@ def prepare_data(
             # Predicting genres
             genre_model = TensorflowPredict2D(graphFilename="genre_discogs400-discogs-effnet-1.pb", input="serving_default_model_Placeholder", output="PartitionedCall:0")
             predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.25)
+            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.2)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
             if metadata.genre is not None:
                 print('Augmenting auto-label', ','.join(filtered_labels), 'with metadata', metadata.genre)
@@ -335,6 +334,9 @@ def train(
         warmup: int = Input(description="Warmup of lr_scheduler", default=8),
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
+    # Before we do a bunch of work, let's make sure dora is installed
+    sp.call(["dora", "--version"])
+
     meta_path = 'src/meta'
     target_path = 'src/train_data'
 
@@ -409,7 +411,7 @@ def train(
     if updates_per_epoch is not None:
         args.append(f"logging.log_updates={updates_per_epoch//10 if updates_per_epoch//10 >=1 else 1}")
     else:
-        args.append(f"logging.log_updates=0")
+        args.append("logging.log_updates=0")
     args.append(f"dataset.batch_size={batch_size}")
     args.append(f"optim.optimizer={optimizer}")
 

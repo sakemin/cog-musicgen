@@ -18,38 +18,19 @@ build:
     - libchromaprint-dev
     - numactl
     - sox
-    # - "libgl1-mesa-glx"
-    # - "libglib2.0-0"
 
   # python version in the form '3.8' or '3.8.12'
-  python_version: "3.9"
+  python_version: "3.10"
 
   # a list of packages in the format <package-name>==<version>
   python_packages:
-    - "demucs"
     - "torch==2.1.0"
-    - "av"
-    - "einops"
-    - flashy>=0.0.1
-    - "hydra-core>=1.1"
-    - "hydra_colorlog"
-    - "julius"
-    - "num2words"
     - "numpy"
-    - "sentencepiece"
-    - "spacy==3.5.2"
     - "torchaudio"
-    - "huggingface_hub"
     - "tqdm"
-    - "transformers>=4.31.0"
-    - "xformers==0.0.22.post7 --index-url https://download.pytorch.org/whl/cu121"
-    - "demucs"
+    - "git+https://github.com/facebookresearch/demucs@v4.0.1#egg=demucs"
+    - "git+https://github.com/facebookresearch/audiocraft#egg=audiocraft"
     - "librosa"
-    - "gradio"
-    - "torchmetrics"
-    - "encodec"
-    - "protobuf"
-    - "tensorboard>=1.15"
     - "pydub"
     - "numba"
     - "essentia-tensorflow"
@@ -59,9 +40,8 @@ build:
 
   # commands run after the environment is setup
   run:
-    # - python3 -m pip install -U git+https://github.com/facebookresearch/demucs#egg=demucs
+  #  - python3 -m pip install -U dora-search
   
 # predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"
 train: "train.py:train"
-

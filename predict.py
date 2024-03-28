@@ -16,7 +16,6 @@ import torch
 # Model specific imports
 import torchaudio
 import subprocess
-import typing as tp
 import numpy as np
 
 from audiocraft.models import MusicGen, MultiBandDiffusion
