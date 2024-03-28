@@ -55,6 +55,7 @@ build:
     - "essentia-tensorflow"
     - "moviepy"
     - "tinytag"
+    - "dora-search"
 
   # commands run after the environment is setup
   run:
