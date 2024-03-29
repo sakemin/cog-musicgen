@@ -154,7 +154,7 @@ def prepare_data(
             return filtered_labels, filtered_values
 
         def make_comma_separated_unique(tags):
-            seen_tags = { tag.lower().strip() for tag in tags }
+            seen_tags = { tag.lower().strip() for tag in tags if tag is not None and tag is not ""}
             return ', '.join(list(seen_tags))
 
         def get_audio_features(audio_filename):
@@ -174,7 +174,7 @@ def prepare_data(
             # Predicting genres
             genre_model = TensorflowPredict2D(graphFilename="genre_discogs400-discogs-effnet-1.pb", input="serving_default_model_Placeholder", output="PartitionedCall:0")
             predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.2)
+            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.15)
             filtered_labels = ', '.join(filtered_labels).replace("---", ", ").split(', ')
             print({ 'auto.genre': ','.join(filtered_labels) })
             if metadata.genre is not None:
@@ -328,9 +328,6 @@ def train(
         warmup: int = Input(description="Warmup of lr_scheduler", default=8),
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
-    # Before we do a bunch of work, let's make sure dora is installed
-    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info",])
-
     meta_path = 'src/meta'
     target_path = 'src/train_data'
 
@@ -411,7 +408,7 @@ def train(
         args.append("dataset.train.permutation_on_files=True")
         args.append(f"optim.updates_per_epoch={updates_per_epoch}")
 
-    sp.call(["python3", "dora_main.py", "-P", "audiocraft"]+args)
+    sp.call(["python3", "dora_main.py"]+args)
 
     checkpoint_dir = None
     for dirpath, dirnames, filenames in os.walk("tmp"):

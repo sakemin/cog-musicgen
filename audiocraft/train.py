@@ -21,8 +21,8 @@ import flashy
 import hydra
 import omegaconf
 
-from audiocraft.environment import AudioCraftEnvironment
-from audiocraft.utils.cluster import get_slurm_parameters
+from .environment import AudioCraftEnvironment
+from .utils.cluster import get_slurm_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def resolve_config_dset_paths(cfg):
 
 
 def get_solver(cfg):
-    from audiocraft import solvers
+    from . import solvers
     # Convert batch size to batch size for each GPU
     assert cfg.dataset.batch_size % flashy.distrib.world_size() == 0
     cfg.dataset.batch_size //= flashy.distrib.world_size()

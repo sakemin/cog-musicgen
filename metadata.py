@@ -410,7 +410,7 @@ mood_theme_classes = [
     "ballad",
     "calm",
     "children",
-    "christmas",
+    "", #"christmas",
     "commercial",
     "cool",
     "corporate",
