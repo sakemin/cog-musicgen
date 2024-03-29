@@ -319,7 +319,7 @@ def train(
         drop_vocals: bool = Input(description="Dropping the vocal tracks from the audio files in dataset, by separating sources with Demucs.", default=True),
         one_same_description: str = Input(description="A description for all of audio data", default=None),
         model_version: str = Input(description="Model version to train.", default="stereo-melody", choices=["stereo-melody", "stereo-small", "stereo-medium", "melody", "small", "medium"]),
-        epochs: int = Input(description="Number of epochs to train for", default=2), # set to 5 based on this paper: https://ar5iv.labs.arxiv.org/html/2311.09094
+        epochs: int = Input(description="Number of epochs to train for", default=5), # set to 5 based on this paper: https://ar5iv.labs.arxiv.org/html/2311.09094
         updates_per_epoch: int = Input(description="Number of iterations for one epoch", default=100),
         batch_size: int = Input(description="Batch size. Must be multiple of 8(number of gpus), for 8-gpu training.", default=16),
         optimizer: str = Input(description="Type of optimizer.", default='dadam', choices=["dadam", "adamw"]),
