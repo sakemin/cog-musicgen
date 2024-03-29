@@ -54,13 +54,13 @@ def prepare_data(
     # Decompressing file at dataset_path
     ext = str(dataset_path).rsplit('.', 1)[1]
     if ext == 'zip':
-        sp.run(['unzip', str(dataset_path), '-d', target_path + '/'], check=True)
+        sp.call(['unzip', str(dataset_path), '-d', target_path + '/'])
     elif ext == 'tar':
-        sp.run(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'], check=True)
+        sp.call(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'])
     elif ext == 'gz':
-        sp.run(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'], check=True)
+        sp.call(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'])
     elif ext == 'tgz':
-        sp.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'], check=True)
+        sp.call(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'])
     elif ext in ['wav', 'mp3', 'flac', 'mp4']:
         shutil.move(str(dataset_path), target_path + '/' + str(dataset_path.name))
     else:
@@ -136,10 +136,10 @@ def prepare_data(
 
     # Auto Labeling
     if auto_labeling:
-        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"], check=True)
-        sp.run(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"], check=True)
-        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"], check=True)
-        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"], check=True)
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"])
+        sp.call(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"])
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"])
+        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"])
 
 
         from metadata import genre_labels, mood_theme_classes, instrument_classes
@@ -154,14 +154,8 @@ def prepare_data(
             return filtered_labels, filtered_values
 
         def make_comma_separated_unique(tags):
-            seen_tags = set()
-            result = []
-            for tag in tags:
-                lower = tag.lower().strip()
-                if lower not in seen_tags:
-                    result.append(lower)
-                    seen_tags.add(lower)
-            return ', '.join(result)
+            seen_tags = { tag.lower().strip() for tag in tags }
+            return ', '.join(list(seen_tags))
 
         def get_audio_features(audio_filename):
             audio = MonoLoader(filename=audio_filename, sampleRate=16000, resampleQuality=4)()
@@ -171,7 +165,7 @@ def prepare_data(
             result_dict = {
                 "artist": metadata.artist,
                 "title": metadata.title,
-                "description": metadata.comment + metadata.extra.get('description', "")
+                "description": (metadata.comment or "") + metadata.extra.get('description', "")
             }
 
             embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
@@ -325,7 +319,7 @@ def train(
         drop_vocals: bool = Input(description="Dropping the vocal tracks from the audio files in dataset, by separating sources with Demucs.", default=True),
         one_same_description: str = Input(description="A description for all of audio data", default=None),
         model_version: str = Input(description="Model version to train.", default="stereo-melody", choices=["stereo-melody", "stereo-small", "stereo-medium", "melody", "small", "medium"]),
-        epochs: int = Input(description="Number of epochs to train for", default=3),
+        epochs: int = Input(description="Number of epochs to train for", default=5), # set to 5 based on this paper: https://ar5iv.labs.arxiv.org/html/2311.09094
         updates_per_epoch: int = Input(description="Number of iterations for one epoch", default=100),
         batch_size: int = Input(description="Batch size. Must be multiple of 8(number of gpus), for 8-gpu training.", default=16),
         optimizer: str = Input(description="Type of optimizer.", default='dadam', choices=["dadam", "adamw"]),
@@ -335,7 +329,7 @@ def train(
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
     # Before we do a bunch of work, let's make sure dora is installed
-    sp.run(["python3", "dora_main.py", "-P", "audiocraft", "info"], check=True)
+    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info",])
 
     meta_path = 'src/meta'
     target_path = 'src/train_data'
@@ -386,7 +380,7 @@ def train(
         conditioner = "chroma2music"
     continue_from = f"//pretrained/facebook/musicgen-{model_version}"
 
-    args = ["run", "-d", "-P", "audiocraft", "--", f"solver={solver}", f"model/lm/model_scale={model_scale}", f"continue_from={continue_from}", f"conditioner={conditioner}"]
+    args = ["run", "-d", "--", f"solver={solver}", f"model/lm/model_scale={model_scale}", f"continue_from={continue_from}", f"conditioner={conditioner}"]
     if "stereo" in model_version:
         args.append(f"codebooks_pattern.delay.delays={[0, 0, 1, 1, 2, 2, 3, 3]}")
         args.append('transformer_lm.n_q=8')
@@ -417,7 +411,7 @@ def train(
         args.append("dataset.train.permutation_on_files=True")
         args.append(f"optim.updates_per_epoch={updates_per_epoch}")
 
-    sp.run(["python3", "dora_main.py"]+args, check=True)
+    sp.call(["python3", "dora_main.py", "-P", "audiocraft"]+args)
 
     checkpoint_dir = None
     for dirpath, dirnames, filenames in os.walk("tmp"):
