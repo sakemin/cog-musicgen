@@ -318,7 +318,7 @@ def train(
         auto_labeling: bool = Input(description="Creating label data like genre, mood, theme, instrumentation, key, bpm for each track. Using `essentia-tensorflow` for music information retrieval.", default=True),
         drop_vocals: bool = Input(description="Dropping the vocal tracks from the audio files in dataset, by separating sources with Demucs.", default=True),
         one_same_description: str = Input(description="A description for all of audio data", default=None),
-        model_version: str = Input(description="Model version to train.", default="stereo-melody", choices=["stereo-melody", "stereo-small", "stereo-medium", "melody", "small", "medium"]),
+        model_version: str = Input(description="Model version to train.", default="stereo-melody", choices=["stereo-melody", "stereo-melody-large", "stereo-large", "stereo-small", "stereo-medium", "melody", "small", "medium"]),
         epochs: int = Input(description="Number of epochs to train for", default=5), # set to 5 based on this paper: https://ar5iv.labs.arxiv.org/html/2311.09094
         updates_per_epoch: int = Input(description="Number of iterations for one epoch", default=100),
         batch_size: int = Input(description="Batch size. Must be multiple of 8(number of gpus), for 8-gpu training.", default=16),
@@ -355,16 +355,16 @@ def train(
 
     max_sample_rate, len_dataset = prepare_data(dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, 'cuda')
 
-    if model_version in ["melody", "stereo-melody", "medium", "stereo-medium"]:
+    if "melody" in model_version or "stereo" in model_version or "large" in model_version or "medium" in model_version:
         batch_size = 8
-        print(f"Batch size is reset to {batch_size}, since `medium(melody)` model can only be trained with 8 with current GPU settings.")
+        print(f"Batch size is reset to {batch_size}, since complex models can only be trained with 8 with current GPU settings.")
 
     if batch_size % 8 != 0:
         batch_size = batch_size - (batch_size%8)
         print(f"Batch size is reset to {batch_size}, the multiple of 8(number of gpus).")
 
     # Setting up dora args
-    if model_version not in ["melody", "stereo-melody"]:
+    if "melody" in model_version:
         solver = "musicgen/musicgen_base_32khz"
         if "stereo" in model_version:
             model_scale = model_version.rsplit('-')[-1]
