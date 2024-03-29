@@ -365,16 +365,21 @@ def train(
 
     # Setting up dora args
     if "melody" in model_version:
-        solver = "musicgen/musicgen_base_32khz"
-        if "stereo" in model_version:
-            model_scale = model_version.rsplit('-')[-1]
-        else:
-            model_scale = model_version
-        conditioner = "text2music"
-    else:
-        solver = "musicgen/musicgen_melody_32khz"
-        model_scale = "medium"
         conditioner = "chroma2music"
+        solver = "musicgen/musicgen_melody_32khz"
+    else:
+        solver = "musicgen/musicgen_base_32khz"
+        conditioner = "text2music"
+
+    if "large" in model_version:
+        model_scale = "large"
+    elif "medium" in model_version:
+        model_scale = "medium"
+    elif "small" in model_version:
+        model_scale = "small"
+    else:
+        model_scale = "medium"
+
     continue_from = f"//pretrained/facebook/musicgen-{model_version}"
 
     args = ["run", "-d", "--", f"solver={solver}", f"model/lm/model_scale={model_scale}", f"continue_from={continue_from}", f"conditioner={conditioner}"]

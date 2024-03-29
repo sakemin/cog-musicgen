@@ -413,7 +413,7 @@ mood_theme_classes = [
     "", #"christmas",
     "commercial",
     "cool",
-    "corporate",
+    "", #"corporate",
     "dark",
     "deep",
     "documentary",
