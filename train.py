@@ -18,6 +18,7 @@ import subprocess as sp
 import shutil
 from tqdm import tqdm
 from tinytag import TinyTag
+from pydub import AudioSegment
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 from essentia.standard import (
@@ -51,15 +52,16 @@ def prepare_data(
     d_path.mkdir(exist_ok=True, parents=True)
 
     # Decompressing file at dataset_path
-    if str(dataset_path).rsplit('.', 1)[1] == 'zip':
-        sp.run(['unzip', str(dataset_path), '-d', target_path + '/'])
-    elif str(dataset_path).rsplit('.', 1)[1] == 'tar':
-        sp.run(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'])
-    elif str(dataset_path).rsplit('.', 1)[1] == 'gz':
-        sp.run(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'])
-    elif str(dataset_path).rsplit('.', 1)[1] == 'tgz':
-        sp.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'])
-    elif str(dataset_path).rsplit('.', 1)[1] in ['wav', 'mp3', 'flac', 'mp4']:
+    ext = str(dataset_path).rsplit('.', 1)[1]
+    if ext == 'zip':
+        sp.run(['unzip', str(dataset_path), '-d', target_path + '/'], check=True)
+    elif ext == 'tar':
+        sp.run(['tar', '-xvf', str(dataset_path), '-C', target_path + '/'], check=True)
+    elif ext == 'gz':
+        sp.run(['tar', '-xvzf', str(dataset_path), '-C', target_path + '/'], check=True)
+    elif ext == 'tgz':
+        sp.run(['tar', '-xzvf', str(dataset_path), '-C', target_path + '/'], check=True)
+    elif ext in ['wav', 'mp3', 'flac', 'mp4']:
         shutil.move(str(dataset_path), target_path + '/' + str(dataset_path.name))
     else:
         raise Exception("Not supported compression file type. The file type should be one of 'zip', 'tar', 'tar.gz', 'tgz' types of compression file, or a single 'wav', 'mp3', 'flac', 'mp4' types of audio file.")
@@ -75,8 +77,6 @@ def prepare_data(
         os.remove(target_path+"/.DS_Store")
 
     # Audio Chunking and Vocal Dropping
-    from pydub import AudioSegment
-
     if drop_vocals:
         import demucs.pretrained
         import torchaudio
@@ -88,16 +88,16 @@ def prepare_data(
         if filename.endswith(('.mp3', '.wav', '.flac', '.mp4')):
             if filename.endswith(('.mp4')):
                 import moviepy 
-                video = moviepy.editor.VideoFileClip(os.path(filename))
+                video = moviepy.editor.VideoFileClip(os.path.join(target_path, filename))
                 fname = filename.rsplit('.',1)[0]+'.wav'
                 video.audio.write_audiofile(os.path.join(target_path, fname))
                 print(f'A mp4 file is converted into a wav file : {filename}')
                 os.remove(target_path + '/' + filename)
             else:
                 fname = filename
+
             # Chuking audio files into 30sec chunks
             audio = AudioSegment.from_file(target_path + '/' + fname)
-
             audio = audio.set_frame_rate(44100) # Resampling to 44100
             
             if len(audio)>30000:
@@ -136,10 +136,10 @@ def prepare_data(
 
     # Auto Labeling
     if auto_labeling:
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"], check=True)
-        sp.call(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"], check=True)
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"], check=True)
-        sp.call(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"], check=True)
+        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "--output", "genre_discogs400-discogs-effnet-1.pb"], check=True)
+        sp.run(["curl", "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "--output", "discogs-effnet-bs64-1.pb"], check=True)
+        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "--output", "mtg_jamendo_moodtheme-discogs-effnet-1.pb"], check=True)
+        sp.run(["curl", "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "--output", "mtg_jamendo_instrument-discogs-effnet-1.pb"], check=True)
 
 
         from metadata import genre_labels, mood_theme_classes, instrument_classes
@@ -335,7 +335,7 @@ def train(
         cfg_p: float = Input(description="CFG dropout ratio", default=0.3),
 ) -> TrainingOutput:
     # Before we do a bunch of work, let's make sure dora is installed
-    sp.call(["python3", "dora_main.py", "-P", "audiocraft", "info"], check=True)
+    sp.run(["python3", "dora_main.py", "-P", "audiocraft", "info"], check=True)
 
     meta_path = 'src/meta'
     target_path = 'src/train_data'
@@ -417,7 +417,7 @@ def train(
         args.append("dataset.train.permutation_on_files=True")
         args.append(f"optim.updates_per_epoch={updates_per_epoch}")
 
-    sp.call(["python3", "dora_main.py"]+args, check=True)
+    sp.run(["python3", "dora_main.py"]+args, check=True)
 
     checkpoint_dir = None
     for dirpath, dirnames, filenames in os.walk("tmp"):

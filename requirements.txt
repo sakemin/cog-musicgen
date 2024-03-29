@@ -1,7 +1,0 @@
-numpy
-tqdm
-pydub
-numba
-moviepy
-tinytag
-dora-search
