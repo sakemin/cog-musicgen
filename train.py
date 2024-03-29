@@ -407,8 +407,8 @@ def train(
 
     # Setting up dora args
     if "melody" in model_version:
-        conditioner = "chroma2music"
         solver = "musicgen/musicgen_melody_32khz"
+        conditioner = "chroma2music"
     else:
         solver = "musicgen/musicgen_base_32khz"
         conditioner = "text2music"
