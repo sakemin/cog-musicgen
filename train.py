@@ -123,12 +123,8 @@ def prepare_data(
     ext = str(dataset_path).rsplit(".", 1)[1]
     if ext == "zip":
         sp.call(["unzip", str(dataset_path), "-d", target_path + "/"])
-    elif ext == "tar":
-        sp.call(["tar", "-xvf", str(dataset_path), "-C", target_path + "/"])
-    elif ext == "gz":
+    elif ext in [ "tar", "gz", "tgz" ]:
         sp.call(["tar", "-xvzf", str(dataset_path), "-C", target_path + "/"])
-    elif ext == "tgz":
-        sp.call(["tar", "-xzvf", str(dataset_path), "-C", target_path + "/"])
     elif ext in ["wav", "mp3", "flac", "mp4"]:
         shutil.move(str(dataset_path), target_path + "/" + str(dataset_path.name))
     else:
@@ -137,14 +133,13 @@ def prepare_data(
         )
 
     # Removing __MACOSX and .DS_Store
-    if (Path(target_path) / "__MACOSX").is_dir():
-        shutil.rmtree(target_path + "/__MACOSX")
-    elif (Path(target_path) / "__MACOSX").is_file():
-        os.remove(target_path + "/__MACOSX")
-    if (Path(target_path) / ".DS_Store").is_dir():
-        shutil.rmtree(target_path + "/.DS_Store")
-    elif (Path(target_path) / ".DS_Store").is_file():
-        os.remove(target_path + "/.DS_Store")
+    for item in ["__MACOSX", ".DS_Store"]:
+        item_path = Path(target_path) / item
+        if item_path.exists():
+            if item_path.is_dir():
+                shutil.rmtree(str(item_path))
+            else:
+                os.remove(str(item_path))
 
     # Audio Chunking and Vocal Dropping
     if drop_vocals:
@@ -369,24 +364,10 @@ def train(
     out_path = "trained_model.tar"
 
     # Removing previous training"s leftover
-    if os.path.isfile(out_path):
-        os.remove(out_path)
-    if os.path.isfile("weights"):
-        os.remove("weights")
-    if os.path.isfile("weight"):
-        os.remove("weight")
-    if os.path.isdir("weights"):
-        shutil.rmtree("weights")
-    if os.path.isdir("weight"):
-        shutil.rmtree("weight")
-    if os.path.isdir(meta_path):
-        shutil.rmtree(meta_path)
-    if os.path.isdir(target_path):
-        shutil.rmtree(target_path)
-    if os.path.isdir("models"):
-        shutil.rmtree("models")
-    if os.path.isdir("tmp"):
-        shutil.rmtree("tmp")
+    for path in [out_path, "weights", "weight", meta_path, target_path, "models", "tmp"]:
+        if os.path.exists(path):
+            if os.path.isdir(path): shutil.rmtree(path)
+            else: os.remove(path)
 
     max_sample_rate, len_dataset = prepare_data(
         dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals
