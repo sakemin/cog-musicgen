@@ -27,10 +27,8 @@ from essentia.standard import (
     TensorflowPredictEffnetDiscogs,
     TensorflowPredict2D,
 )
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
 
-device_to_use = "cuda" if torch.cuda.is_available() else "cpu"
 keys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 model_files = [
     "genre_discogs400-discogs-effnet-1.pb",
@@ -115,8 +113,7 @@ def prepare_data(
     one_same_description: str = None,
     meta_path: str = "src/meta",
     auto_labeling: bool = True,
-    drop_vocals: bool = True,
-    device: str = "cuda",
+    drop_vocals: bool = True
 ):
 
     d_path = Path(target_path)
@@ -151,11 +148,7 @@ def prepare_data(
 
     # Audio Chunking and Vocal Dropping
     if drop_vocals:
-        separator = demucs.pretrained.get_model("htdemucs_ft")
-        if device == "cuda":
-            separator = separator.cuda()
-        else:
-            separator = separator.cpu()
+        separator = demucs.pretrained.get_model("htdemucs_ft").cuda()
     else:
         separator = None
 
@@ -195,7 +188,7 @@ def prepare_data(
 
                             # Resample for Demucs
                             chunk = convert_audio(chunk, 44100, separator.samplerate, separator.audio_channels)
-                            stems = apply_model(separator, chunk[None], device=device, shifts=4)
+                            stems = apply_model(separator, chunk[None], device="cuda", shifts=4)
                             stems = stems[
                                 :,
                                 [
@@ -264,9 +257,7 @@ def prepare_data(
                 train_len += 1
                 train_file.write(json.dumps(entry) + "\n")
 
-            device = cuda.get_current_device()
-            device.reset()
-
+            cuda.get_current_device().reset()
             filelen = len(files)
     else:
         meta = audiocraft.data.audio_dataset.find_audio_files(
@@ -398,7 +389,7 @@ def train(
         shutil.rmtree("tmp")
 
     max_sample_rate, len_dataset = prepare_data(
-        dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, device_to_use
+        dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals
     )
 
     # max # of GPUs we can get is 8, so we need to set batch size to 8 if the model is large so we don"t OOM
