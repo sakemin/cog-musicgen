@@ -1,0 +1,13 @@
+torch==2.2.2
+numpy
+torchaudio
+tqdm
+git+https://github.com/facebookresearch/demucs@v4.0.1#egg=demucs
+git+https://github.com/facebookresearch/audiocraft@v1.2.0#egg=audiocraft
+librosa
+pydub
+numba
+#essentia-tensorflow
+moviepy
+tinytag
+dora-search

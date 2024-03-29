@@ -30,6 +30,15 @@ from essentia.standard import (
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
 
+device_to_use = "cuda" if torch.cuda.is_available() else "cpu"
+keys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+model_files = [
+    "genre_discogs400-discogs-effnet-1.pb",
+    "discogs-effnet-bs64-1.pb",
+    "mtg_jamendo_moodtheme-discogs-effnet-1.pb",
+    "mtg_jamendo_instrument-discogs-effnet-1.pb",
+]
+
 logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
 )
@@ -40,6 +49,65 @@ logging.getLogger("sh.command").setLevel(logging.ERROR)
 class TrainingOutput(BaseModel):
     weights: Path
 
+
+def filter_predictions(predictions, class_list, threshold):
+    predictions_mean = np.mean(predictions, axis=0)
+    sorted_indices = np.argsort(predictions_mean)[::-1]
+    filtered_indices = [i for i in sorted_indices if predictions_mean[i] > threshold]
+    filtered_labels = [class_list[i] for i in filtered_indices]
+    filtered_values = [predictions_mean[i] for i in filtered_indices]
+    return filtered_labels, filtered_values
+
+def make_comma_separated_unique(tags):
+    seen_tags = {tag.lower().strip() for tag in tags if tag is not None and tag is not ""}
+    return ", ".join(list(seen_tags))
+
+def get_audio_features(audio_filename):
+    audio = MonoLoader(filename=audio_filename, sampleRate=16000, resampleQuality=4)()
+    # Load ID3 tags if available
+    metadata = TinyTag.get(audio_filename)
+
+    result_dict = {
+        "artist": metadata.artist,
+        "title": metadata.title,
+        "description": (metadata.comment or "") + metadata.extra.get("description", ""),
+    }
+
+    embedding_model = TensorflowPredictEffnetDiscogs(
+        graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1"
+    )
+    embeddings = embedding_model(audio)
+
+    # Predicting genres
+    genre_model = TensorflowPredict2D(
+        graphFilename="genre_discogs400-discogs-effnet-1.pb",
+        input="serving_default_model_Placeholder",
+        output="PartitionedCall:0",
+    )
+    predictions = genre_model(embeddings)
+    filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.15)
+    filtered_labels = ", ".join(filtered_labels).replace("---", ", ").split(", ")
+    print({"auto.genre": ",".join(filtered_labels)})
+    if metadata.genre is not None:
+        print({"metadata.genre": metadata.genre})
+        filtered_labels = filtered_labels + metadata.genre.split(",")
+    result_dict["genres"] = make_comma_separated_unique(filtered_labels)
+
+    # Predicting mood/theme
+    mood_model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
+    predictions = mood_model(embeddings)
+    filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.06)
+    print({"auto.moods": ",".join(filtered_labels)})
+    result_dict["moods"] = make_comma_separated_unique(filtered_labels)
+
+    # Predicting instruments
+    instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
+    predictions = instrument_model(embeddings)
+    filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.15)
+    print({"auto.instruments": ",".join(filtered_labels)})
+    result_dict["instruments"] = filtered_labels
+
+    return result_dict
 
 def prepare_data(
     dataset_path: Path,
@@ -83,7 +151,11 @@ def prepare_data(
 
     # Audio Chunking and Vocal Dropping
     if drop_vocals:
-        separator = demucs.pretrained.get_model("htdemucs_ft").to("cuda")
+        separator = demucs.pretrained.get_model("htdemucs_ft")
+        if device == "cuda":
+            separator = separator.cuda()
+        else:
+            separator = separator.cpu()
     else:
         separator = None
 
@@ -123,7 +195,7 @@ def prepare_data(
 
                             # Resample for Demucs
                             chunk = convert_audio(chunk, 44100, separator.samplerate, separator.audio_channels)
-                            stems = apply_model(separator, chunk[None], device="cuda", shifts=4)
+                            stems = apply_model(separator, chunk[None], device=device, shifts=4)
                             stems = stems[
                                 :,
                                 [
@@ -142,74 +214,9 @@ def prepare_data(
 
     # Auto Labeling
     if auto_labeling:
-        model_files = [
-            "genre_discogs400-discogs-effnet-1.pb",
-            "discogs-effnet-bs64-1.pb",
-            "mtg_jamendo_moodtheme-discogs-effnet-1.pb",
-            "mtg_jamendo_instrument-discogs-effnet-1.pb",
-        ]
         for model_file in model_files:
             model_url = f"https://essentia.upf.edu/models/{model_file.replace('-', '/')}"
             sp.call(["curl", model_url, "--output", model_file])
-
-        def filter_predictions(predictions, class_list, threshold):
-            predictions_mean = np.mean(predictions, axis=0)
-            sorted_indices = np.argsort(predictions_mean)[::-1]
-            filtered_indices = [i for i in sorted_indices if predictions_mean[i] > threshold]
-            filtered_labels = [class_list[i] for i in filtered_indices]
-            filtered_values = [predictions_mean[i] for i in filtered_indices]
-            return filtered_labels, filtered_values
-
-        def make_comma_separated_unique(tags):
-            seen_tags = {tag.lower().strip() for tag in tags if tag is not None and tag is not ""}
-            return ", ".join(list(seen_tags))
-
-        def get_audio_features(audio_filename):
-            audio = MonoLoader(filename=audio_filename, sampleRate=16000, resampleQuality=4)()
-            # Load ID3 tags if available
-            metadata = TinyTag.get(audio_filename)
-
-            result_dict = {
-                "artist": metadata.artist,
-                "title": metadata.title,
-                "description": (metadata.comment or "") + metadata.extra.get("description", ""),
-            }
-
-            embedding_model = TensorflowPredictEffnetDiscogs(
-                graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1"
-            )
-            embeddings = embedding_model(audio)
-
-            # Predicting genres
-            genre_model = TensorflowPredict2D(
-                graphFilename="genre_discogs400-discogs-effnet-1.pb",
-                input="serving_default_model_Placeholder",
-                output="PartitionedCall:0",
-            )
-            predictions = genre_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, genre_labels, threshold=0.15)
-            filtered_labels = ", ".join(filtered_labels).replace("---", ", ").split(", ")
-            print({"auto.genre": ",".join(filtered_labels)})
-            if metadata.genre is not None:
-                print({"metadata.genre": metadata.genre})
-                filtered_labels = filtered_labels + metadata.genre.split(",")
-            result_dict["genres"] = make_comma_separated_unique(filtered_labels)
-
-            # Predicting mood/theme
-            mood_model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
-            predictions = mood_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, mood_theme_classes, threshold=0.06)
-            print({"auto.moods": ",".join(filtered_labels)})
-            result_dict["moods"] = make_comma_separated_unique(filtered_labels)
-
-            # Predicting instruments
-            instrument_model = TensorflowPredict2D(graphFilename="mtg_jamendo_instrument-discogs-effnet-1.pb")
-            predictions = instrument_model(embeddings)
-            filtered_labels, _ = filter_predictions(predictions, instrument_classes, threshold=0.15)
-            print({"auto.instruments": ",".join(filtered_labels)})
-            result_dict["instruments"] = filtered_labels
-
-            return result_dict
 
         train_len = 0
 
@@ -227,7 +234,7 @@ def prepare_data(
                 tempo = round(tempo)
                 chroma = librosa.feature.chroma_stft(y=y, sr=sr)
                 key = np.argmax(np.sum(chroma, axis=1))
-                key = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][key]
+                key = keys[key]
                 length = librosa.get_duration(y=y, sr=sr)
 
                 sr = librosa.get_samplerate(str(filename))
@@ -391,7 +398,7 @@ def train(
         shutil.rmtree("tmp")
 
     max_sample_rate, len_dataset = prepare_data(
-        dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, "cuda"
+        dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals, device_to_use
     )
 
     # max # of GPUs we can get is 8, so we need to set batch size to 8 if the model is large so we don"t OOM
