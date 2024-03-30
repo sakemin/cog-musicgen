@@ -122,11 +122,11 @@ def prepare_data(
     # Decompressing file at dataset_path
     ext = str(dataset_path).rsplit(".", 1)[1]
     if ext == "zip":
-        sp.call(["unzip", str(dataset_path), "-d", target_path + "/"])
+        sp.call(["unzip", str(dataset_path), "-d", f"{target_path}/"])
     elif ext in [ "tar", "gz", "tgz" ]:
-        sp.call(["tar", "-xvzf", str(dataset_path), "-C", target_path + "/"])
+        sp.call(["tar", "-xvzf", str(dataset_path), "-C", f"{target_path}/"])
     elif ext in ["wav", "mp3", "flac", "mp4"]:
-        shutil.move(str(dataset_path), target_path + "/" + str(dataset_path.name))
+        shutil.move(str(dataset_path), f"{target_path}/{dataset_path.name}")
     else:
         raise Exception(
             "Not supported compression file type. The file type should be one of 'zip', 'tar', 'tar.gz', 'tgz' types of compression file, or a single 'wav', 'mp3', 'flac', 'mp4' types of audio file."
@@ -159,7 +159,7 @@ def prepare_data(
                 fname = filename
 
             # Chuking audio files into 30sec chunks
-            audio = AudioSegment.from_file(target_path + "/" + fname)
+            audio = AudioSegment.from_file(f"{target_path}/{fname}")
             audio = audio.set_frame_rate(44100)  # Resampling to 44100
 
             if len(audio) > 30000:
@@ -168,35 +168,35 @@ def prepare_data(
                 # Splitting the audio files into 30-second chunks
                 for i in range(0, len(audio), 30000):
                     chunk = audio[i : i + 30000]
-                    if len(chunk) > 5000:  # Omitting residuals with <5sec duration
-                        if drop_vocals and separator is not None:
-                            chunk_fname = f"{target_path}/{fname[:-4]}_chunk{i//1000}.wav"
-                            print("Separating Vocals from " + chunk_fname)
+                    chunk_fname = f"{target_path}/{fname.rsplit('.', 1)[0]}_chunk{i//1000}.wav"
+                    if len(chunk) <= 5000:
+                        continue
+                    if not drop_vocals or separator is None:
+                        chunk.export(chunk_fname, format="wav")
+                        continue
+                    print("Separating Vocals from " + chunk_fname)
 
-                            channel_sounds = chunk.split_to_mono()
-                            samples = [s.get_array_of_samples() for s in channel_sounds]
+                    channel_sounds = chunk.split_to_mono()
+                    samples = [s.get_array_of_samples() for s in channel_sounds]
 
-                            chunk = np.array(samples).T.astype(np.float32)
-                            chunk /= np.iinfo(samples[0].typecode).max
-                            chunk = torch.Tensor(chunk).T
-                            print(chunk.shape)
+                    chunk = np.array(samples).T.astype(np.float32)
+                    chunk /= np.iinfo(samples[0].typecode).max
+                    chunk = torch.Tensor(chunk).T
 
-                            # Resample for Demucs
-                            chunk = convert_audio(chunk, 44100, separator.samplerate, separator.audio_channels)
-                            stems = apply_model(separator, chunk[None], device="cuda", shifts=4)
-                            stems = stems[
-                                :,
-                                [
-                                    separator.sources.index("bass"),
-                                    separator.sources.index("drums"),
-                                    separator.sources.index("other"),
-                                ],
-                            ]
-                            mixed = stems.sum(1)
-                            torchaudio.save(chunk_fname, mixed.squeeze(0), separator.samplerate)
-                        else:
-                            chunk.export(chunk_fname, format="wav")
-                os.remove(target_path + "/" + fname)
+                    # Resample for Demucs
+                    chunk = convert_audio(chunk, 44100, separator.samplerate, separator.audio_channels)
+                    stems = apply_model(separator, chunk[None], device="cuda", shifts=4)
+                    stems = stems[
+                        :,
+                        [
+                            separator.sources.index("bass"),
+                            separator.sources.index("drums"),
+                            separator.sources.index("other"),
+                        ],
+                    ]
+                    mixed = stems.sum(1)
+                    torchaudio.save(chunk_fname, mixed.squeeze(0), separator.samplerate)
+                os.remove(f"{target_path}/{fname}")
 
     max_sample_rate = 0
 
@@ -209,7 +209,7 @@ def prepare_data(
         train_len = 0
 
         os.mkdir(meta_path)
-        with open(meta_path + "/data.jsonl", "w", encoding="utf-8") as train_file:
+        with open(f"{meta_path}/data.jsonl", "w", encoding="utf-8") as train_file:
             files = list(d_path.rglob("*.mp3")) + list(d_path.rglob("*.wav")) + list(d_path.rglob("*.flac"))
             if len(files) == 0:
                 raise ValueError("No audio file detected. Are you sure the audio file is longer than 5 seconds?")
@@ -245,7 +245,7 @@ def prepare_data(
                     "keywords": "",
                     "name": "",
                 }
-                with open(str(filename).rsplit(".", 1)[0] + ".json", "w", encoding="utf-8") as file:
+                with open(f"{filename.rsplit('.', 1)[0]}.json", "w", encoding="utf-8") as file:
                     json.dump(entry, file)
                 print(entry)
 
@@ -285,30 +285,30 @@ def prepare_data(
                 "instrument": "",
                 "moods": [],
             }
-            with open(m.path.rsplit(".", 1)[0] + ".json", "w", encoding="utf-8") as file:
+            with open(f"{m.path.rsplit('.', 1)[0]}.json", "w", encoding="utf-8") as file:
                 json.dump(fdict, file)
-        audiocraft.data.audio_dataset.save_audio_meta(meta_path + "/data.jsonl", meta)
+        audiocraft.data.audio_dataset.save_audio_meta(f"{meta_path}/data.jsonl", meta)
         filelen = len(meta)
 
     audios = list(d_path.rglob("*.mp3")) + list(d_path.rglob("*.wav"))
 
     for audio in list(audios):
-        with open(str(audio).rsplit(".", 1)[0] + ".json", "r", encoding="utf-8") as jsonf:
+        with open(f"{audio.rsplit('.', 1)[0]}.json", "r", encoding="utf-8") as jsonf:
             fdict = json.load(jsonf)
 
         if one_same_description is None:
-            if Path(str(audio).rsplit(".", 1)[0] + ".txt").exists():
-                with open(str(audio).rsplit(".", 1)[0] + ".txt", "r", encoding="utf-8") as f:
+            if Path(f"{audio.rsplit('.', 1)[0]}.txt").exists():
+                with open(f"{audio.rsplit('.', 1)[0]}.txt", "r", encoding="utf-8") as f:
                     line = f.readline()
                 fdict["description"] = line
-            elif Path(str(audio).rsplit("_chunk", 1)[0] + ".txt").exists():
-                with open(str(audio).rsplit("_chunk", 1)[0] + ".txt", "r", encoding="utf-8") as f:
+            elif Path(f"{audio.rsplit('_chunk', 1)[0]}.txt").exists():
+                with open(f"{audio.rsplit('_chunk', 1)[0]}.txt", "r", encoding="utf-8") as f:
                     line = f.readline()
                 fdict["description"] = line
         else:
             fdict["description"] = one_same_description
 
-        with open(str(audio).rsplit(".", 1)[0] + ".json", "w", encoding="utf-8") as file:
+        with open(f"{audio.rsplit('.', 1)[0]}.json", "w", encoding="utf-8") as file:
             json.dump(fdict, file)
 
     return max_sample_rate, filelen
