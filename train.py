@@ -220,8 +220,10 @@ def prepare_data(
                 y, sr = librosa.load(str(filename))
                 tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
                 tempo = round(tempo)
+
+                # https://medium.com/@oluyaled/detecting-musical-key-from-audio-using-chroma-feature-in-python-72850c0ae4b1
                 chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-                key = np.argmax(np.sum(chroma, axis=1))
+                key = np.argmax(np.mean(chroma, axis=1))
                 key = keys[key]
                 length = librosa.get_duration(y=y, sr=sr)
 
