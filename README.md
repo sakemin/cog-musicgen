@@ -119,8 +119,8 @@ cog train -i dataset_path=@<path-to-your-data> <additional hyperparameters>
 ### Train Inputs
 - `dataset_path`: Path = Input("Path to the dataset directory")
 - `one_same_description`: str = Input(description="A description for all audio data", default=None)
-- `"auto_labeling"`: bool = Input(description="Generate labels (genre, mood, theme, etc.) for each track using `essentia-tensorflow` for music information retrieval", default=True)
-- `"drop_vocals"`: bool = Input(description="Remove vocal tracks from audio files using Demucs source separation", default=True)
+- `auto_labeling`: bool = Input(description="Generate labels (genre, mood, theme, etc.) for each track using `essentia-tensorflow` for music information retrieval", default=True)
+- `source`: str = Input(description="Apply source separation to input audio ('all' leaves audio uneffected)", default="all")
 - `model_version`: str = Input(description="Model version to train", default="stereo-melody", choices=[“melody”, “small”, “medium”, “stereo-melody”, “stereo-small”, “stereo-medium”])
 - `lr`: float = Input(description="Learning rate", default=1)
 - `epochs`: int = Input(description="Number of epochs to train for", default=10)

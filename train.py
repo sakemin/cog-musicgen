@@ -113,7 +113,7 @@ def prepare_data(
     one_same_description: str = None,
     meta_path: str = "src/meta",
     auto_labeling: bool = True,
-    drop_vocals: bool = True
+    source: str = 'all'
 ):
 
     d_path = Path(target_path)
@@ -142,7 +142,8 @@ def prepare_data(
                 os.remove(str(item_path))
 
     # Audio Chunking and Vocal Dropping
-    if drop_vocals:
+    use_demucs = not source == 'all'
+    if use_demucs:
         separator = demucs.pretrained.get_model("htdemucs_ft").cuda()
     else:
         separator = None
@@ -171,7 +172,7 @@ def prepare_data(
                     chunk_fname = f"{target_path}/{fname.rsplit('.', 1)[0]}_chunk{i//1000}.wav"
                     if len(chunk) <= 5000:
                         continue
-                    if not drop_vocals or separator is None:
+                    if not use_demucs or separator is None:
                         chunk.export(chunk_fname, format="wav")
                         continue
                     print("Separating Vocals from " + chunk_fname)
@@ -186,16 +187,19 @@ def prepare_data(
                     # Resample for Demucs
                     chunk = convert_audio(chunk, 44100, separator.samplerate, separator.audio_channels)
                     stems = apply_model(separator, chunk[None], device="cuda", shifts=4)
-                    stems = stems[
-                        :,
-                        [
-                            separator.sources.index("bass"),
-                            separator.sources.index("drums"),
-                            separator.sources.index("other"),
-                        ],
-                    ]
-                    mixed = stems.sum(1)
-                    torchaudio.save(chunk_fname, mixed.squeeze(0), separator.samplerate)
+                    if source == 'drop-vocals':
+                        stems = stems[
+                            :,
+                            [
+                                separator.sources.index("bass"),
+                                separator.sources.index("drums"),
+                                separator.sources.index("other"),
+                            ],
+                        ]
+                        audio = stems.sum(1)
+                    else:
+                        audio = stems[:, separator.sources.index(source)]
+                    torchaudio.save(chunk_fname, audio.squeeze(0), separator.samplerate)
                 os.remove(f"{target_path}/{fname}")
 
     max_sample_rate = 0
@@ -324,9 +328,17 @@ def train(
         description="Creating label data like genre, mood, theme, instrumentation, key, bpm for each track. Using `essentia-tensorflow` for music information retrieval.",
         default=True,
     ),
-    drop_vocals: bool = Input(
-        description="Dropping the vocal tracks from the audio files in dataset, by separating sources with Demucs.",
-        default=True,
+    source: str = Input(
+        description="Apply source separation to input audio ('all' leaves audio uneffected)",
+        default="all",
+        choices=[
+            "all",
+            "drop-vocals",
+            "vocals",
+            "bass",
+            "drums",
+            "other"
+        ]
     ),
     one_same_description: str = Input(description="A description for all of audio data", default=None),
     model_version: str = Input(
