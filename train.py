@@ -13,7 +13,7 @@ import librosa
 from numba import cuda
 import torch
 from metadata import genre_labels, mood_theme_classes, instrument_classes
-import demucs
+from demucs.pretrained import get_model
 from demucs.apply import apply_model
 from demucs.audio import convert_audio
 import numpy as np
@@ -144,7 +144,7 @@ def prepare_data(
     # Audio Chunking and Vocal Dropping
     use_demucs = not source == 'all'
     if use_demucs:
-        separator = demucs.pretrained.get_model("htdemucs_ft").cuda()
+        separator = get_model("htdemucs_ft").cuda()
     else:
         separator = None
 
