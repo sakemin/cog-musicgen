@@ -384,7 +384,7 @@ def train(
             else: os.remove(path)
 
     max_sample_rate, len_dataset = prepare_data(
-        dataset_path, target_path, one_same_description, meta_path, auto_labeling, drop_vocals
+        dataset_path, target_path, one_same_description, meta_path, auto_labeling, source
     )
 
     # max # of GPUs we can get is 8, so we need to set batch size to 8 if the model is large so we don"t OOM
